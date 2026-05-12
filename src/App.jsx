@@ -114,7 +114,7 @@ export default function MotoCalc() {
 
   const fare = calcFare(km, time, route, bag);
 
-  const phrase = `"Angahe?" — Ubwira uti: "Birenze cyane, ${fare.mid.toLocaleString()} francs gusa."`;
+  const phrase = `"Angahe?" — Ubwira uti: "Uri guhenda cyane, ${fare.mid.toLocaleString()} francs gusa."`;
   const phraseTranslation = `"How much?" — Then say: "That's too much, only ${fare.mid.toLocaleString()} RWF."`;
 
   const copyPhrase = () => {
