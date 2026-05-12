@@ -1,0 +1,398 @@
+import { useState, useEffect, useRef } from "react";
+
+const COLORS = {
+  bg: "#0D0D0D",
+  surface: "#161616",
+  card: "#1E1E1E",
+  green: "#00C853",
+  greenDim: "#00C85322",
+  greenBorder: "#00C85344",
+  yellow: "#FFD600",
+  yellowDim: "#FFD60015",
+  text: "#F5F0E8",
+  muted: "#888580",
+  border: "#2A2A2A",
+  danger: "#FF5252",
+};
+
+const BASE_RATE = 150;
+const TIME_MULTIPLIERS = { day: 1.0, peak: 1.3, night: 1.55 };
+const ROUTE_MULTIPLIERS = { city: 1.0, suburb: 1.15, hill: 1.4 };
+const BAG_ADDON = { none: 0, small: 100, large: 300 };
+
+function calcFare(km, time, route, bag) {
+  const raw = BASE_RATE * km * TIME_MULTIPLIERS[time] * ROUTE_MULTIPLIERS[route] + BAG_ADDON[bag];
+  const mid = Math.round(raw / 50) * 50;
+  const lo = Math.round(mid * 0.8 / 50) * 50;
+  const hi = Math.round(mid * 1.2 / 50) * 50;
+  const walk = Math.round(mid * 1.45 / 50) * 50;
+  return { mid, lo, hi, walk, pkm: Math.round(mid / km) };
+}
+
+const TIPS = {
+  day: "Agree on the price BEFORE you board — always.",
+  peak: "Peak hours 7–9am & 5–7pm. Drivers know demand is high. Hold firm.",
+  night: "Night rides cost more. Walk to a busier street for more options.",
+};
+
+const ROUTES_INFO = {
+  city: "Kigali CBD, Kimironko, Remera, Kacyiru",
+  suburb: "Kanombe, Masaka, Rusororo, Gikondo",
+  hill: "Nyamirambo hills, Kanyinya, Batsinda, Ndera",
+};
+
+function ChipGroup({ options, value, onChange, color = "green" }) {
+  return (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      {options.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 100,
+              border: active
+                ? `1.5px solid ${color === "yellow" ? COLORS.yellow : COLORS.green}`
+                : `1px solid ${COLORS.border}`,
+              background: active
+                ? color === "yellow" ? COLORS.yellowDim : COLORS.greenDim
+                : "transparent",
+              color: active
+                ? color === "yellow" ? COLORS.yellow : COLORS.green
+                : COLORS.muted,
+              fontSize: 13,
+              fontFamily: "inherit",
+              fontWeight: active ? 600 : 400,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              letterSpacing: "0.02em",
+            }}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function AnimatedNumber({ value }) {
+  const [display, setDisplay] = useState(value);
+  const prev = useRef(value);
+
+  useEffect(() => {
+    const start = prev.current;
+    const end = value;
+    const diff = end - start;
+    if (diff === 0) return;
+    const steps = 18;
+    let i = 0;
+    const timer = setInterval(() => {
+      i++;
+      const eased = start + diff * (1 - Math.pow(1 - i / steps, 3));
+      setDisplay(Math.round(eased / 50) * 50);
+      if (i >= steps) {
+        setDisplay(end);
+        prev.current = end;
+        clearInterval(timer);
+      }
+    }, 16);
+    return () => clearInterval(timer);
+  }, [value]);
+
+  return <>{display.toLocaleString()}</>;
+}
+
+export default function MotoCalc() {
+  const [km, setKm] = useState(3);
+  const [time, setTime] = useState("day");
+  const [route, setRoute] = useState("city");
+  const [bag, setBag] = useState("none");
+  const [copied, setCopied] = useState(false);
+
+  const fare = calcFare(km, time, route, bag);
+
+  const phrase = `"Angahe?" — Ubwira uti: "Birenze cyane, ${fare.mid.toLocaleString()} francs gusa."`;
+  const phraseTranslation = `"How much?" — Then say: "That's too much, only ${fare.mid.toLocaleString()} RWF."`;
+
+  const copyPhrase = () => {
+    navigator.clipboard.writeText(phrase).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const fairnessColor =
+    km <= 2 ? COLORS.green :
+    km <= 8 ? COLORS.green :
+    COLORS.yellow;
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: COLORS.bg,
+      color: COLORS.text,
+      fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+      maxWidth: 480,
+      margin: "0 auto",
+      padding: "0 0 60px",
+    }}>
+
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+      {/* Header */}
+      <div style={{
+        padding: "28px 20px 0",
+        borderBottom: `1px solid ${COLORS.border}`,
+        paddingBottom: 20,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+          <div style={{
+            width: 8, height: 8, borderRadius: "50%",
+            background: COLORS.green,
+            boxShadow: `0 0 8px ${COLORS.green}`,
+            animation: "pulse 2s infinite",
+          }} />
+          <span style={{ fontSize: 11, color: COLORS.green, letterSpacing: "0.12em", fontWeight: 600, textTransform: "uppercase", fontFamily: "'DM Mono', monospace" }}>
+            Kigali Moto Fares
+          </span>
+        </div>
+        <h1 style={{
+          fontSize: 26, fontWeight: 600, margin: "0 0 4px",
+          lineHeight: 1.2, color: COLORS.text,
+        }}>
+          Know your fare.<br />
+          <span style={{ color: COLORS.green }}>Don't overpay.</span>
+        </h1>
+        <p style={{ fontSize: 13, color: COLORS.muted, margin: 0, lineHeight: 1.5 }}>
+          Estimated fair moto taxi prices in Kigali, Rwanda
+        </p>
+      </div>
+
+      {/* Main fare display */}
+      <div style={{
+        margin: "16px 20px",
+        background: COLORS.surface,
+        border: `1px solid ${COLORS.greenBorder}`,
+        borderRadius: 16,
+        padding: "20px",
+        position: "relative",
+        overflow: "hidden",
+      }}>
+        <div style={{
+          position: "absolute", top: -30, right: -30,
+          width: 120, height: 120, borderRadius: "50%",
+          background: COLORS.greenDim,
+          filter: "blur(30px)",
+        }} />
+        <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 4, fontFamily: "'DM Mono', monospace", letterSpacing: "0.08em" }}>
+          FAIR FARE
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+          <span style={{ fontSize: 44, fontWeight: 600, color: COLORS.green, lineHeight: 1, fontFamily: "'DM Mono', monospace" }}>
+            <AnimatedNumber value={fare.mid} />
+          </span>
+          <span style={{ fontSize: 16, color: COLORS.muted, fontWeight: 500 }}>RWF</span>
+        </div>
+        <div style={{ fontSize: 13, color: COLORS.muted, marginTop: 4 }}>
+          Range: <span style={{ color: COLORS.text }}>{fare.lo.toLocaleString()} – {fare.hi.toLocaleString()} RWF</span>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 16 }}>
+          {[
+            { label: "Per km", val: `${fare.pkm.toLocaleString()} RWF` },
+            { label: "Max pay", val: `${fare.hi.toLocaleString()} RWF` },
+            { label: "Walk away", val: `${fare.walk.toLocaleString()} RWF` },
+          ].map((s) => (
+            <div key={s.label} style={{
+              background: COLORS.card,
+              borderRadius: 10,
+              padding: "10px 10px",
+              border: `1px solid ${COLORS.border}`,
+            }}>
+              <div style={{ fontSize: 10, color: COLORS.muted, marginBottom: 3, letterSpacing: "0.06em", textTransform: "uppercase" }}>{s.label}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, fontFamily: "'DM Mono', monospace" }}>{s.val}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div style={{ padding: "0 20px" }}>
+
+        {/* Distance */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, letterSpacing: "0.04em" }}>Distance</span>
+            <span style={{
+              fontSize: 15, fontWeight: 600, color: COLORS.green,
+              fontFamily: "'DM Mono', monospace",
+              background: COLORS.greenDim,
+              padding: "2px 10px", borderRadius: 20,
+              border: `1px solid ${COLORS.greenBorder}`,
+            }}>{km} km</span>
+          </div>
+          <input
+            type="range" min={1} max={20} value={km} step={1}
+            onChange={(e) => setKm(parseInt(e.target.value))}
+            style={{ width: "100%", accentColor: COLORS.green, cursor: "pointer" }}
+          />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: COLORS.muted, marginTop: 4, fontFamily: "'DM Mono', monospace" }}>
+            <span>1 km</span><span>10 km</span><span>20 km</span>
+          </div>
+        </div>
+
+        {/* Time of day */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginBottom: 10, letterSpacing: "0.04em" }}>Time of day</div>
+          <ChipGroup
+            value={time}
+            onChange={setTime}
+            options={[
+              { label: "Daytime", value: "day" },
+              { label: "Peak hour", value: "peak" },
+              { label: "Night", value: "night" },
+            ]}
+          />
+          <div style={{ marginTop: 8, fontSize: 12, color: COLORS.muted, lineHeight: 1.5 }}>
+            {TIPS[time]}
+          </div>
+        </div>
+
+        {/* Route type */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginBottom: 10, letterSpacing: "0.04em" }}>Route type</div>
+          <ChipGroup
+            value={route}
+            onChange={setRoute}
+            options={[
+              { label: "City centre", value: "city" },
+              { label: "Suburb", value: "suburb" },
+              { label: "Hilly / remote", value: "hill" },
+            ]}
+          />
+          <div style={{ marginTop: 8, fontSize: 12, color: COLORS.muted }}>
+            e.g. {ROUTES_INFO[route]}
+          </div>
+        </div>
+
+        {/* Luggage */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginBottom: 10, letterSpacing: "0.04em" }}>Luggage</div>
+          <ChipGroup
+            value={bag}
+            onChange={setBag}
+            color="yellow"
+            options={[
+              { label: "None", value: "none" },
+              { label: "Small bag", value: "small" },
+              { label: "Large item (+300)", value: "large" },
+            ]}
+          />
+        </div>
+
+        {/* Kinyarwanda phrase */}
+        <div style={{
+          background: "#111A13",
+          border: `1px solid #1E3A22`,
+          borderRadius: 14,
+          padding: "16px",
+          marginBottom: 20,
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.green, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10, fontFamily: "'DM Mono', monospace" }}>
+            Kinyarwanda negotiation phrase
+          </div>
+          <p style={{ fontSize: 15, color: COLORS.text, margin: "0 0 6px", lineHeight: 1.6, fontStyle: "italic" }}>
+            "Angahe?"
+          </p>
+          <p style={{ fontSize: 13, color: COLORS.text, margin: "0 0 2px", lineHeight: 1.6 }}>
+            Ubwira uti: <strong style={{ color: COLORS.green }}>"Birenze cyane, {fare.mid.toLocaleString()} francs gusa."</strong>
+          </p>
+          <p style={{ fontSize: 12, color: COLORS.muted, margin: "8px 0 12px", lineHeight: 1.5 }}>
+            "How much?" → "That's too much, only {fare.mid.toLocaleString()} RWF."
+          </p>
+          <button
+            onClick={copyPhrase}
+            style={{
+              width: "100%",
+              padding: "10px",
+              borderRadius: 10,
+              border: `1px solid ${COLORS.greenBorder}`,
+              background: copied ? COLORS.greenDim : "transparent",
+              color: copied ? COLORS.green : COLORS.muted,
+              fontSize: 13,
+              fontFamily: "inherit",
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: "all 0.2s",
+              letterSpacing: "0.03em",
+            }}
+          >
+            {copied ? "✓ Copied to clipboard" : "Copy phrase"}
+          </button>
+        </div>
+
+        {/* Safety tips */}
+        <div style={{
+          background: COLORS.surface,
+          border: `1px solid ${COLORS.border}`,
+          borderRadius: 14,
+          padding: "16px",
+          marginBottom: 8,
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12, fontFamily: "'DM Mono', monospace" }}>
+            Safety reminders
+          </div>
+          {[
+            "Always wear the helmet the driver offers you.",
+            "Agree on the price before boarding — never after.",
+            "Check the moto plate number if travelling alone at night.",
+            "Licensed motos in Kigali wear orange vests.",
+          ].map((tip, i) => (
+            <div key={i} style={{ display: "flex", gap: 10, marginBottom: i < 3 ? 10 : 0, alignItems: "flex-start" }}>
+              <div style={{ width: 5, height: 5, borderRadius: "50%", background: COLORS.muted, marginTop: 6, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, color: COLORS.muted, lineHeight: 1.5 }}>{tip}</span>
+            </div>
+          ))}
+        </div>
+
+        <p style={{ fontSize: 11, color: COLORS.border, textAlign: "center", marginTop: 20, lineHeight: 1.6 }}>
+          Fares are estimates based on common Kigali rates.<br />Actual prices may vary. Last updated 2025.
+        </p>
+      </div>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+        input[type=range] {
+          -webkit-appearance: none;
+          height: 4px;
+          background: ${COLORS.border};
+          border-radius: 4px;
+          outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          width: 20px; height: 20px;
+          border-radius: 50%;
+          background: ${COLORS.green};
+          cursor: pointer;
+          box-shadow: 0 0 0 4px ${COLORS.greenDim};
+        }
+        input[type=range]::-moz-range-thumb {
+          width: 20px; height: 20px;
+          border-radius: 50%;
+          background: ${COLORS.green};
+          cursor: pointer;
+          border: none;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: ${COLORS.bg}; }
+      `}</style>
+    </div>
+  );
+}
